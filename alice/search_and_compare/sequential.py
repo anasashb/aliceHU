@@ -97,14 +97,6 @@ class BackEliminator():
         # for both models
         new_feature_list_m1 = self.initial_feature_list.copy()
         new_feature_list_m2 = self.initial_feature_list.copy()
-
-
-        ### DEBUG
-        print(f'Before loop m1:{new_feature_list_m1}')
-        print(f'Before loop m2: {new_feature_list_m2}')
-        ### DEBUG    
-
-
         # Aggreeability scores
         results = []
         # First fit models w/o any removed features
@@ -138,6 +130,17 @@ class BackEliminator():
             f'Model 2 {self.criterion.upper()}': m2_score,
             f'Agreeability Coefficient ({self.agreeability})': agreeability_coeff
         })
+
+
+        ### DEBUG PRINTS
+        print(f'Initial run: fitted both models with full feature set.')
+        print(f'-' * 150)
+        print(f'Model 1 included: {new_feature_list_m1}. {self.criterion.upper()}: {m1_score}')
+        print(f'Model 2 included: {new_feature_list_m2}. {self.criterion.upper()}: {m2_score}')
+        print(f'-' * 150)
+        print(f'Agreeability Coefficient ({self.agreeability}): {agreeability_coeff}')
+        print(f'=' * 150)
+        ### DEBUG PRINTS   
         
         ### DEBUG
         counter = 0
@@ -158,12 +161,6 @@ class BackEliminator():
             new_feature_list_m2.remove(worst_feature_m2)
 
 
-            ### DEBUG
-            print(f'At iteration {counter} m1:{new_feature_list_m1}')
-            print(f'At iteration {counter} m2: {new_feature_list_m2}')
-            ### DEBUG    
-
-
             # Compute agreeability
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
             # Append to results
@@ -174,6 +171,16 @@ class BackEliminator():
                 f'Model 2 {self.criterion.upper()}': m2_score,
                 f'Agreeability Coefficient ({self.agreeability})': agreeability_coeff
             })
+
+            ### DEBUG PRINTS
+            print(f'Iteration {counter}:')
+            print(f'-' * 150)
+            print(f'Model 1 included: {new_feature_list_m1}. {self.criterion.upper()}: {m1_score}')
+            print(f'Model 2 included: {new_feature_list_m2}. {self.criterion.upper()}: {m2_score}')
+            print(f'-' * 150)
+            print(f'Agreeability Coefficient ({self.agreeability}): {agreeability_coeff}')
+            print(f'=' * 150)
+            ### DEBUG PRINTS
         # Save results
         self.results = results
         # Return results
