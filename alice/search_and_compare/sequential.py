@@ -2,6 +2,9 @@ from alice.metrics.regress import mse, rmse, mae
 from alice.metrics.classify import accuracy, precision, recall, f1
 from alice.agreeability.regress import pearson
 from alice.agreeability.classify import cohen_kappa
+from alice.utils.feature_lists import dummy_grouper
+from alice.utils.feature_lists import feature_fixer
+from alice.utils.feature_lists import feature_list_flatten
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
@@ -16,7 +19,9 @@ class BackEliminator():
                  validation_data=None,
                  task_type=None,
                  criterion=None,
-                 agreeability=None
+                 agreeability=None,
+                 dummy_list=None,
+                 features_to_fix=None
                  ):
 
         self.X = X
@@ -40,12 +45,10 @@ class BackEliminator():
             'cohen_kappa': cohen_kappa
         }
         self.agreeability = agreeability
-        self.initial_feature_list = list(self.X.columns)
         # To append all scores per dropped feature for all iterations of while loop
         self.scores_m1 = []
         self.scores_m2 = []
-
-
+    
         #### =========================================================================================== ####
         #### NEW SORTING DEFINED                                                                            #
         #### ---------------------------------------------------------------------------------------------- #
@@ -69,6 +72,21 @@ class BackEliminator():
         #### Return will be (worst_feature, best_score, best_preds) from iteration                          #
         #### =========================================================================================== ####
 
+        # Handle feature lists
+        # Will default to None if not provided
+        self.dummy_list = dummy_list
+        # Will default to None if not provided
+        self.features_to_fix = features_to_fix
+        # Group columns obtained from a one-hot-encoded variable together
+        if self.dummy_list:
+            self.initial_feature_list = dummy_grouper(feature_list=list(self.X.columns), dummy_list=self.dummy_list)
+        else:
+            self.initial_feature_list = list(self.X.columns)
+        # Remove features we want to fix from the feature list
+        if self.features_to_fix:
+            self.initial_feature_list = feature_fixer(self.initial_feature_list, self.features_to_fix)
+        
+    
     # Method to be called in the main method of back elimination
     def _deselect_feature(self,
                           feature_list,
@@ -81,6 +99,8 @@ class BackEliminator():
             temporary_set = feature_list.copy()
             # Drop feature from set
             temporary_set.remove(feature)
+            # Flatten list
+            temporary_set = feature_list_flatten(temporary_set)
             # Train
             model.fit(self.X[temporary_set], self.y)
             # Predict on validation set
@@ -134,25 +154,28 @@ class BackEliminator():
         # Aggreeability scores
         results = []
         # First fit models w/o any removed features
-        m1.fit(self.X[new_feature_list_m1], self.y)
-        m2.fit(self.X[new_feature_list_m2], self.y)
+        # Flat lists for fitting
+        full_fit_m1 = feature_list_flatten(new_feature_list_m1)
+        full_fit_m2 = feature_list_flatten(new_feature_list_m2)
+        m1.fit(self.X[full_fit_m1], self.y)
+        m2.fit(self.X[full_fit_m2], self.y)
         # Predict on validation set
         if self.validation_data:
             # Model 1
-            m1_preds = m1.predict(self.X_val[new_feature_list_m1])
+            m1_preds = m1.predict(self.X_val[full_fit_m1])
             m1_score = self.criterion_registry[self.criterion](self.y_val, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X_val[new_feature_list_m2])
+            m2_preds = m2.predict(self.X_val[full_fit_m2])
             m2_score = self.criterion_registry[self.criterion](self.y_val, m2_preds)
             # Aggreeability Score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
         # Predict on training set
         else:
             # Model 1
-            m1_preds = m1.predict(self.X[new_feature_list_m1])
+            m1_preds = m1.predict(self.X[full_fit_m1])
             m1_score = self.criterion_registry[self.criterion](self.y, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X[new_feature_list_m2])
+            m2_preds = m2.predict(self.X[full_fit_m2])
             m2_score = self.criterion_registry[self.criterion](self.y, m2_preds)
             # Agreeability score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
@@ -160,9 +183,9 @@ class BackEliminator():
         # Append to results
         
         results.append({
-            f'Best: M1 Included Features': new_feature_list_m1.copy(),
+            f'Best: M1 Included Features': full_fit_m1.copy(),
             f'Best: M1 {self.criterion.upper()}': m1_score,
-            f'Best: M2 Included Features': new_feature_list_m2.copy(),
+            f'Best: M2 Included Features': full_fit_m2.copy(),
             f'Best: M2 {self.criterion.upper()}': m2_score,
             f'Best: Agreeability ({self.agreeability})': agreeability_coeff,
             })            
@@ -206,14 +229,17 @@ class BackEliminator():
             # Update included feature lists
             new_feature_list_m1.remove(worst_feature_m1)
             new_feature_list_m2.remove(worst_feature_m2)
+            # Flat lists to append to results
+            flat_feature_list_m1 = feature_list_flatten(new_feature_list_m1)
+            flat_feature_list_m2 = feature_list_flatten(new_feature_list_m2)
 
             # Compute agreeability
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
             # Append to results
             results.append({
-                'Model 1 Included Features': new_feature_list_m1.copy(),
+                'Model 1 Included Features': flat_feature_list_m1.copy(),
                 f'Model 1 {self.criterion.upper()}': m1_score,
-                'Model 2 Included Features': new_feature_list_m2.copy(),
+                'Model 2 Included Features': flat_feature_list_m2.copy(),
                 f'Model 2 {self.criterion.upper()}': m2_score,
                 f'Agreeability Coefficient ({self.agreeability})': agreeability_coeff
             })
@@ -249,27 +275,30 @@ class BackEliminator():
         new_feature_list_m2 = self.initial_feature_list.copy()
         # Aggreeability scores
         results = []
+        # Flat lists for fitting
+        full_fit_m1 = feature_list_flatten(new_feature_list_m1)
+        full_fit_m2 = feature_list_flatten(new_feature_list_m2)
         # First fit models w/o any removed features
-        m1.fit(self.X[new_feature_list_m1], self.y)
-        m2.fit(self.X[new_feature_list_m2], self.y)
+        m1.fit(self.X[full_fit_m1], self.y)
+        m2.fit(self.X[full_fit_m2], self.y)
         # Predict on validation set
         if self.validation_data:
             # Model 1
-            m1_preds = m1.predict(self.X_val[new_feature_list_m1])
+            m1_preds = m1.predict(self.X_val[full_fit_m1])
             best_score_m1 = self.criterion_registry[self.criterion](self.y_val, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X_val[new_feature_list_m2])
+            m2_preds = m2.predict(self.X_val[full_fit_m2])
             best_score_m2 = self.criterion_registry[self.criterion](self.y_val, m2_preds)
             # Aggreeability Score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
         # Predict on training set
         else:
             # Model 1
-            m1_preds = m1.predict(self.X[new_feature_list_m1])
-            m1_score = self.criterion_registry[self.criterion](self.y, m1_preds)
+            m1_preds = m1.predict(self.X[full_fit_m1])
+            best_score_m1 = self.criterion_registry[self.criterion](self.y, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X[new_feature_list_m2])
-            m2_score = self.criterion_registry[self.criterion](self.y, m2_preds)
+            m2_preds = m2.predict(self.X[full_fit_m2])
+            best_score_m2 = self.criterion_registry[self.criterion](self.y, m2_preds)
             # Agreeability score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
         
@@ -287,9 +316,9 @@ class BackEliminator():
         #})          
 
         results.append({
-            f'Best: M1 Included Features': new_feature_list_m1.copy(),
+            f'Best: M1 Included Features': full_fit_m1.copy(),
             f'Best: M1 {self.criterion}': best_score_m1,
-            f'Best: M2 Included Features': new_feature_list_m2.copy(),
+            f'Best: M2 Included Features': full_fit_m2.copy(),
             f'Best: M2 {self.criterion}': best_score_m2,
             f'Best: Agreeability ({self.agreeability})': agreeability_coeff,
             f'All: M1 Mean {self.criterion}': best_score_m1,
@@ -386,13 +415,15 @@ class BackEliminator():
             # Update included feature lists
             new_feature_list_m1.remove(worst_feature_m1)
             new_feature_list_m2.remove(worst_feature_m2)
-
+            # Flat lists to append to results
+            flat_feature_list_m1 = feature_list_flatten(new_feature_list_m1)
+            flat_feature_list_m2 = feature_list_flatten(new_feature_list_m2)
             #### ADD A TOPRINT METHOD SOMEWHERE TO MAKE SURE WE ARE NOT calling .upper() uselessly -- for the time being removed uppers.
             # Append to results
             results.append({
-                f'Best: M1 Included Features': new_feature_list_m1.copy(),
+                f'Best: M1 Included Features': flat_feature_list_m1.copy(),
                 f'Best: M1 {self.criterion}': best_score_m1,
-                f'Best: M2 Included Features': new_feature_list_m2.copy(),
+                f'Best: M2 Included Features': flat_feature_list_m2.copy(),
                 f'Best: M2 {self.criterion}': best_score_m2,
                 f'Best: Agreeability ({self.agreeability})': agreeability_coeff,
                 f'All: M1 Mean {self.criterion}': mean_score_m1,
