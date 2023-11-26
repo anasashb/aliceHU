@@ -46,8 +46,8 @@ class BackEliminator():
         }
         self.agreeability = agreeability
         # To append all scores per dropped feature for all iterations of while loop
-        self.scores_m1 = []
-        self.scores_m2 = []
+        self.scores_n_preds_m1 = []
+        self.scores_n_preds_m2 = []
     
         #### =========================================================================================== ####
         #### NEW SORTING DEFINED                                                                            #
@@ -373,9 +373,12 @@ class BackEliminator():
             # Obtain all scores for m1 and m2
             all_scores_m1 = [row[1] for row in score_per_dropped_feature_m1]
             all_scores_m2 = [row[1] for row in score_per_dropped_feature_m2]
+            # Obtain all preds for m1 and m2
+            all_preds_m1 = [row[2] for row in score_per_dropped_feature_m1]
+            all_preds_m2 = [row[2] for row in score_per_dropped_feature_m2]
             # Append to respective containers ####### TO BE USED IN A NEW METHOD FOR TESTING #########
-            self.scores_m1.append(all_scores_m1)
-            self.scores_m2.append(all_scores_m2)
+            self.scores_n_preds_m1.append((all_scores_m1, all_preds_m1))
+            self.scores_n_preds_m2.append((all_scores_m2, all_preds_m2))
             # Get best scores 
             best_score_m1 = all_scores_m1[0]
             best_score_m2 = all_scores_m2[0]
