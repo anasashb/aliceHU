@@ -2,6 +2,8 @@ from alice.metrics.regress import mse, rmse, mae
 from alice.metrics.classify import accuracy, precision, recall, f1
 from alice.agreeability.regress import pearson
 from alice.agreeability.classify import cohen_kappa
+from alice.testing.classify import mcnemar_binomial, mcnemar_chisquare
+from alice.testing.regress import t_test
 from alice.utils.feature_lists import dummy_grouper
 from alice.utils.feature_lists import feature_fixer
 from alice.utils.feature_lists import feature_list_flatten
@@ -44,10 +46,15 @@ class BackEliminator():
             'pearson': pearson,
             'cohen_kappa': cohen_kappa
         }
+        self.testing_registry = {
+            'mcnemar_binomial': mcnemar_binomial,
+            'mcnemar_chisquare': mcnemar_chisquare,
+            't_test': t_test
+        }
         self.agreeability = agreeability
         # To append all scores per dropped feature for all iterations of while loop
-        self.scores_n_preds_m1 = []
-        self.scores_n_preds_m2 = []
+        self.scores_and_preds_m1 = []
+        self.scores_and_preds_m2 = []
     
         #### =========================================================================================== ####
         #### NEW SORTING DEFINED                                                                            #
@@ -377,8 +384,8 @@ class BackEliminator():
             all_preds_m1 = [row[2] for row in score_per_dropped_feature_m1]
             all_preds_m2 = [row[2] for row in score_per_dropped_feature_m2]
             # Append to respective containers ####### TO BE USED IN A NEW METHOD FOR TESTING #########
-            self.scores_n_preds_m1.append((all_scores_m1, all_preds_m1))
-            self.scores_n_preds_m2.append((all_scores_m2, all_preds_m2))
+            self.scores_and_preds_m1.append((all_scores_m1, all_preds_m1))
+            self.scores_and_preds_m2.append((all_scores_m2, all_preds_m2))
             # Get best scores 
             best_score_m1 = all_scores_m1[0]
             best_score_m2 = all_scores_m2[0]
@@ -457,6 +464,55 @@ class BackEliminator():
         # Return results
         return results
 
+    def compare_n_best(self, 
+                       n=None,
+                       test=None):
+        '''
+        Method for pair-wise comparison of n amount of best predictions obtained by the models.
+        The pairwise tests are conducted within the predictions of each models and will test if predictions obtained are statistically significantly different from each other.
+        
+        Args:
+            n (int): How many best results to compare.
+            test (str): Statistical test to use. Options: 'mcnemar_binomial' and 'mcnemar_chisquare' for binary classification. 't_test' for regression.
+        
+        Returns:
+            None. pval_and_stats_m1 and pval_and_stats_m2 are callable lists containing corresponding test statistics and p-values.
+        
+        Example: Setting n=3 will test:
+                - M1: best predictions against second best predictions; second best predictions and third best predictions.
+                - M2: best predictions against second best predictions; second best predictions and third best predictions. 
+        '''
+        # Make sure the search is alrady ran and results are there.
+        if not self.scores_and_preds_m1 and not self.scores_and_preds_m2:
+            raise ValueError('No predictions found. Run a comparison algorithm first.')
+        # Make sure n != value more than available best predictions
+        if n > len(self.scores_and_preds_m1):
+            raise ValueError(f'Picked n is more than available amount of best predictions. Use n <= {len(self.scores_and_preds_m1)}.')
+        # Make sure test supported
+        if test not in self.testing_registry:
+            raise ValueError("Test not supported. Please use 'mcnemar_binomial' or 'mcnemar_chisquare' for classification or 't_test' for regression.")
+        # Empty containers
+        self.pval_and_stats_m1 = []
+        self.pval_and_stats_m2 = []
+        # Iterate n-1 times
+        for i in range(n-1):
+            # Get result for model 1
+            pval_m1, stat_m1 = self.testing_registry[test](
+                self.scores_and_preds_m1[i][1][0],
+                self.scores_and_preds_m1[i+1][1][0],
+                self.y_val
+            )
+            self.pval_and_stats_m1.append((pval_m1, stat_m1))
+            # Get result for model 2
+            pval_m2, stat_m2 = self.testing_registry[test](
+                self.scores_and_preds_m2[i][1][0],
+                self.scores_and_preds_m2[i+1][1][0],
+                self.y_val
+            )
+            self.pval_and_stats_m2.append((pval_m2, stat_m2))
+            print(f'Model 1: Results for No. {i+1} and No. {i+2} best predictions: P-value: {pval_m1:.8f}. Test statistic: {stat_m1:.8f}.')
+            print(f'Model 2: Results for No. {i+1} and No. {i+2} best predictions: P-value: {pval_m2:.8f}. Test statistic: {stat_m2:.8f}.')
+            print('='*120)
 
         #### REMOVE DESELECT_INPROG REMOVE DESELECT_INPROG REMOVE DESELECT_INPROG
 
