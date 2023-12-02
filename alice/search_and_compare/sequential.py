@@ -14,6 +14,55 @@ from plotly.subplots import make_subplots
 import numpy as np
 
 class BackEliminator():
+    '''
+    The class is built for conducting backwards feature elimination in combination with model agreeability. A more detailed documentation will follow.
+    
+    Args:
+        X (pd.DataFrame): A pandas dataframe containing predictors.
+        y (pd.DataFrame): A pandas dataframe containing target.
+        validation_data (tuple): A tuple of validation data (X_val, y_val).
+        task_type (str): String for task type. Available options - 'classification' or 'regression'.
+        criterion (str): String for intra-model evaluation criterion. Available options: 'mse', 'rmse', 'mae', 'accuracy', 'precision', 'recall', 'f1'.
+        agreeability (str): String for inter-model comparison. Available options: 'pearson', 'cohen_kappa'
+        dummy_list (list): List of lists containing column names (str) of dummy features generated from a categorical variable. (Optional).
+        features_to_fix (list): List containing column names (str) of features that will be excluded from feature elimination and thus always included in modeling. (Optional)
+    
+    Regression Example:
+        seeker = Backeliminator(
+            X=X_train,
+            y=y_train,
+            validation_data=(X_val, y_val),
+            task_type='regression',
+            criterion='rmse',
+            agreeability='pearson',
+            dummy_list=[
+                ['dummy_1_from_variable_1', 'dummy_2_from_variable_1'],
+                ['dummy_1_from_variable_2', 'dummy_2_from_variable_2', 'dummy_3_from_variable_2']
+            ],
+            features_to_fix=[
+                'variable_3',
+                'variable_4'
+            ]
+        )
+    
+    Classification Example:
+        seeker = Backeliminator(
+            X=X_train,
+            y=y_train,
+            validation_data=(X_val, y_val),
+            task_type='classification',
+            criterion='f1',
+            agreeability='cohen_kappa',
+            dummy_list=[
+                ['dummy_1_from_variable_1', 'dummy_2_from_variable_1'],
+                ['dummy_1_from_variable_2', 'dummy_2_from_variable_2', 'dummy_3_from_variable_2']
+            ],
+            features_to_fix=[
+                'variable_3',
+                'variable_4'
+            ]
+        )    
+    '''
 
     def __init__(self,
                  X=None,
@@ -272,9 +321,7 @@ class BackEliminator():
             m2
         ):
         '''
-        Note: feature elimination strategy same as compare_best_models().
-        At higher computing costs, evaluates agreeability between sub-par models at each iteration and computers mean agreeability score and standard deviation.
-        Results obtained from _deselect_feature are ordered from best to worst
+        No docstring yet.
         ''' 
         # Copy all features initially
         # for both models
