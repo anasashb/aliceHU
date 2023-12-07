@@ -16,6 +16,7 @@ def dummy_grouper(feature_list, dummy_list):
         Therefore, it gets ensured that the _deselect_feature method treats each one-hot-encoded variable as one feature to drop during iteration.
     '''
     # Empty container for feature list with grouped dummy columnes
+    missing_features = []
     feature_list_with_grouped_dummies = []
     # Flatten the dummy_list of lists into a single list
     dummy_list_flat = [item for sublist in dummy_list for item in sublist]
@@ -30,9 +31,11 @@ def dummy_grouper(feature_list, dummy_list):
             # Append group if condition satisfied
             feature_list_with_grouped_dummies.append(group)
         else:
-            raise ValueError(f'A feature/features from dummy list not found in the original feature list. Make sure the dummy_list is correctly specified.')
+            missing_features = [feature for feature in group if feature not in feature_list]
+            raise ValueError(f'The following features from the group {group} are not found in the original feature list: {missing_features}')    
     
     return feature_list_with_grouped_dummies
+
 
 def feature_fixer(feature_list, features_to_fix):
     '''
