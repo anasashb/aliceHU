@@ -7,6 +7,9 @@ from alice.testing.regress import t_test
 from alice.utils.feature_lists import dummy_grouper
 from alice.utils.feature_lists import feature_fixer
 from alice.utils.feature_lists import feature_list_flatten
+from alice.utils.model_training import KerasParams
+from alice.utils.model_training import ModelTrainer
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
@@ -72,7 +75,7 @@ class BackEliminator():
                  criterion=None,
                  agreeability=None,
                  dummy_list=None,
-                 features_to_fix=None
+                 features_to_fix=None,
                  ):
 
         self.X = X
@@ -146,7 +149,8 @@ class BackEliminator():
     # Method to be called in the main method of back elimination
     def _deselect_feature(self,
                           feature_list,
-                          model):
+                          model,
+                          keras_params=None):
         # Empty list for scores
         score_per_dropped_feature = []
         # Iterate over all features
@@ -158,15 +162,15 @@ class BackEliminator():
             # Flatten list
             temporary_set = feature_list_flatten(temporary_set)
             # Train
-            model.fit(self.X[temporary_set], self.y)
+            ModelTrainer.fit(model=model, X=self.X[temporary_set], y=self.y, keras_params=keras_params)
             # Predict on validation set
             if self.validation_data:
-                y_preds = model.predict(self.X_val[temporary_set])
+                y_preds = ModelTrainer.predict(model=model, X=self.X_val[temporary_set], keras_params=keras_params)
                 # Evaluate
                 score = self.criterion_registry[self.criterion](self.y_val, y_preds)
             # Predict on training set
             else:
-                y_preds = model.predict(self.X[temporary_set])
+                y_preds = ModelTrainer.predict(model=model, X=self.X[temporary_set], keras_params=keras_params)
                 score = self.criterion_registry[self.criterion](self.y, y_preds)
             # Append feature name, score after dropping it, y_preds after dropping it
             score_per_dropped_feature.append((feature, score, y_preds))
@@ -201,7 +205,8 @@ class BackEliminator():
     def compare_best_models(
             self,
             m1,
-            m2
+            m2,
+            keras_params=None
         ): 
         # Copy all features initially
         # for both models
@@ -213,25 +218,25 @@ class BackEliminator():
         # Flat lists for fitting
         full_fit_m1 = feature_list_flatten(new_feature_list_m1)
         full_fit_m2 = feature_list_flatten(new_feature_list_m2)
-        m1.fit(self.X[full_fit_m1], self.y)
-        m2.fit(self.X[full_fit_m2], self.y)
+        ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
+        ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
         # Predict on validation set
         if self.validation_data:
             # Model 1
-            m1_preds = m1.predict(self.X_val[full_fit_m1])
+            m1_preds = ModelTrainer.predict(model=m1, X=self.X_val[full_fit_m1], keras_params=keras_params)
             m1_score = self.criterion_registry[self.criterion](self.y_val, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X_val[full_fit_m2])
+            m2_preds = ModelTrainer.predict(model=m2, X=self.X_val[full_fit_m1], keras_params=keras_params)
             m2_score = self.criterion_registry[self.criterion](self.y_val, m2_preds)
             # Aggreeability Score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
         # Predict on training set
         else:
             # Model 1
-            m1_preds = m1.predict(self.X[full_fit_m1])
+            m1_preds = ModelTrainer.predict(model=m1, X=self.X[full_fit_m1], keras_params=keras_params)
             m1_score = self.criterion_registry[self.criterion](self.y, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X[full_fit_m2])
+            m2_preds = ModelTrainer.predict(model=m2, X=self.X[full_fit_m1], keras_params=keras_params)
             m2_score = self.criterion_registry[self.criterion](self.y, m2_preds)
             # Agreeability score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
@@ -275,8 +280,8 @@ class BackEliminator():
             #new_feature_list_m2.remove(worst_feature_m2)
 
             # Obtain the score lists (removed feature, corresponding score, corresponding preds)
-            score_per_dropped_feature_m1 = self._deselect_feature(new_feature_list_m1, m1)
-            score_per_dropped_feature_m2 = self._deselect_feature(new_feature_list_m2, m2)
+            score_per_dropped_feature_m1 = self._deselect_feature(new_feature_list_m1, m1, keras_params)
+            score_per_dropped_feature_m2 = self._deselect_feature(new_feature_list_m2, m2, keras_params)
 
             # Get the worst_feature, best_score, best_preds
             worst_feature_m1, m1_score, m1_preds = self.find_worst_feature(score_per_dropped_feature_m1)
@@ -318,7 +323,8 @@ class BackEliminator():
     def compare_all_models(
             self,
             m1,
-            m2
+            m2,
+            keras_params=None
         ):
         '''
         No docstring yet.
@@ -333,25 +339,26 @@ class BackEliminator():
         full_fit_m1 = feature_list_flatten(new_feature_list_m1)
         full_fit_m2 = feature_list_flatten(new_feature_list_m2)
         # First fit models w/o any removed features
-        m1.fit(self.X[full_fit_m1], self.y)
-        m2.fit(self.X[full_fit_m2], self.y)
+        ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
+        ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
         # Predict on validation set
         if self.validation_data:
             # Model 1
-            m1_preds = m1.predict(self.X_val[full_fit_m1])
+            m1_preds = ModelTrainer.predict(model=m1, X=self.X_val[full_fit_m1], keras_params=keras_params)
             best_score_m1 = self.criterion_registry[self.criterion](self.y_val, m1_preds)
+
             # Model 2
-            m2_preds = m2.predict(self.X_val[full_fit_m2])
+            m2_preds = ModelTrainer.predict(model=m2, X=self.X_val[full_fit_m1], keras_params=keras_params)
             best_score_m2 = self.criterion_registry[self.criterion](self.y_val, m2_preds)
             # Aggreeability Score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
         # Predict on training set
         else:
             # Model 1
-            m1_preds = m1.predict(self.X[full_fit_m1])
+            m1_preds = ModelTrainer.predict(model=m1, X=self.X[full_fit_m1], keras_params=keras_params)
             best_score_m1 = self.criterion_registry[self.criterion](self.y, m1_preds)
             # Model 2
-            m2_preds = m2.predict(self.X[full_fit_m2])
+            m2_preds = ModelTrainer.predict(model=m2, X=self.X[full_fit_m1], keras_params=keras_params)
             best_score_m2 = self.criterion_registry[self.criterion](self.y, m2_preds)
             # Agreeability score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
@@ -412,8 +419,8 @@ class BackEliminator():
             #new_feature_list_m2.remove(worst_feature_m2)
 
             # Obtain the score lists (removed feature, score, preds)
-            score_per_dropped_feature_m1 = self._deselect_feature(new_feature_list_m1, m1)
-            score_per_dropped_feature_m2 = self._deselect_feature(new_feature_list_m2, m2)
+            score_per_dropped_feature_m1 = self._deselect_feature(new_feature_list_m1, m1, keras_params)
+            score_per_dropped_feature_m2 = self._deselect_feature(new_feature_list_m2, m2, keras_params)
 
             # Sort the list
             # Note that after sorting row results will not match iteration for iteration in _deselect_feature runs for m1 and m2

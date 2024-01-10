@@ -19,3 +19,9 @@ def pearson(x, y):
     r = num / denom
 
     return r
+
+
+####### TO ADD #######
+# Spearman
+# Kendall
+####### TO ADD #######
