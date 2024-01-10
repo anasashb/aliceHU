@@ -1,2 +1,4 @@
-
+# ignore git files 
 *.pyc
+# Ignore pychache folders
+__pycache__/
