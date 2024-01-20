@@ -7,8 +7,11 @@ from alice.testing.regress import t_test
 from alice.utils.feature_lists import dummy_grouper
 from alice.utils.feature_lists import feature_fixer
 from alice.utils.feature_lists import feature_list_flatten
+from alice.utils.model_training import KerasSequential
 from alice.utils.model_training import KerasParams
 from alice.utils.model_training import ModelTrainer
+
+import gc
 
 import pandas as pd
 import plotly.express as px
@@ -153,28 +156,33 @@ class BackEliminator():
                           keras_params=None):
         # Empty list for scores
         score_per_dropped_feature = []
+        counter = 0 ## DEBUG DEBUG DEBUG
         # Iterate over all features
         for feature in feature_list:
+
+            counter += 1 ## DEBUG DEBUG DEBUG
             # Generate temporary feature set to manipulate
             temporary_set = feature_list.copy()
             # Drop feature from set
             temporary_set.remove(feature)
             # Flatten list
             temporary_set = feature_list_flatten(temporary_set)
+            X_temporary = self.X[temporary_set]
             # Train
-            ModelTrainer.fit(model=model, X=self.X[temporary_set], y=self.y, keras_params=keras_params)
+            #if ModelTrainer.is_keras_seq(model):
+                #print(f'Model identified as keras seq. Finna build with shape: {X_temporary.shape[1]}')
+            temp_model = ModelTrainer.fit(model=model, X=X_temporary, y=self.y, keras_params=keras_params)
             # Predict on validation set
             if self.validation_data:
-                y_preds = ModelTrainer.predict(model=model, X=self.X_val[temporary_set], keras_params=keras_params)
+                y_preds = ModelTrainer.predict(model=temp_model, X=self.X_val[temporary_set], keras_params=keras_params)
                 # Evaluate
                 score = self.criterion_registry[self.criterion](self.y_val, y_preds)
             # Predict on training set
             else:
-                y_preds = ModelTrainer.predict(model=model, X=self.X[temporary_set], keras_params=keras_params)
+                y_preds = ModelTrainer.predict(model=temp_model, X=self.X[temporary_set], keras_params=keras_params)
                 score = self.criterion_registry[self.criterion](self.y, y_preds)
             # Append feature name, score after dropping it, y_preds after dropping it
             score_per_dropped_feature.append((feature, score, y_preds))
-
         #### Deprecated ####
         # At the end of loop, identify feature
         # which led to the worst score when 
@@ -218,8 +226,8 @@ class BackEliminator():
         # Flat lists for fitting
         full_fit_m1 = feature_list_flatten(new_feature_list_m1)
         full_fit_m2 = feature_list_flatten(new_feature_list_m2)
-        ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
-        ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
+        m1 = ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
+        m2 = ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
         # Predict on validation set
         if self.validation_data:
             # Model 1
@@ -339,26 +347,26 @@ class BackEliminator():
         full_fit_m1 = feature_list_flatten(new_feature_list_m1)
         full_fit_m2 = feature_list_flatten(new_feature_list_m2)
         # First fit models w/o any removed features
-        ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
-        ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
+        temp_m1 = ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
+        temp_m2 = ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
         # Predict on validation set
         if self.validation_data:
             # Model 1
-            m1_preds = ModelTrainer.predict(model=m1, X=self.X_val[full_fit_m1], keras_params=keras_params)
+            m1_preds = ModelTrainer.predict(model=temp_m1, X=self.X_val[full_fit_m1], keras_params=keras_params)
             best_score_m1 = self.criterion_registry[self.criterion](self.y_val, m1_preds)
 
             # Model 2
-            m2_preds = ModelTrainer.predict(model=m2, X=self.X_val[full_fit_m1], keras_params=keras_params)
+            m2_preds = ModelTrainer.predict(model=temp_m2, X=self.X_val[full_fit_m1], keras_params=keras_params)
             best_score_m2 = self.criterion_registry[self.criterion](self.y_val, m2_preds)
             # Aggreeability Score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
         # Predict on training set
         else:
             # Model 1
-            m1_preds = ModelTrainer.predict(model=m1, X=self.X[full_fit_m1], keras_params=keras_params)
+            m1_preds = ModelTrainer.predict(model=temp_m1, X=self.X[full_fit_m1], keras_params=keras_params)
             best_score_m1 = self.criterion_registry[self.criterion](self.y, m1_preds)
             # Model 2
-            m2_preds = ModelTrainer.predict(model=m2, X=self.X[full_fit_m1], keras_params=keras_params)
+            m2_preds = ModelTrainer.predict(model=temp_m2, X=self.X[full_fit_m1], keras_params=keras_params)
             best_score_m2 = self.criterion_registry[self.criterion](self.y, m2_preds)
             # Agreeability score
             agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
@@ -375,6 +383,7 @@ class BackEliminator():
             #f'All: Mean Agreeability ({self.agreeability})': np.mean(agreeability_coeff),
             #f'All: Agreeability St. Dev.': np.std(agreeability_coeff)
         #})          
+
 
         results.append({
             f'Best: M1 Included Features': full_fit_m1.copy(),
@@ -509,7 +518,7 @@ class BackEliminator():
             print(f'-' * 150)
             print(f'Results from all models:')
             print(f'M1 mean score: {mean_score_m1:.4f}. Standard deviation: {std_score_m1:.4f}')
-            print(f'M1 mean score: {mean_score_m2:.4f}. Standard deviation: {std_score_m2:.4f}')
+            print(f'M2 mean score: {mean_score_m2:.4f}. Standard deviation: {std_score_m2:.4f}')
             print(f'Mean agreeability coefficient ({self.agreeability}): {mean_agreeability:.4f}. Standard deviation: {std_agreeability:.4f}')
             print(f'=' * 150)
             ### DEBUG PRINTS
