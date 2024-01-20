@@ -32,11 +32,43 @@ class KerasParams:
         '''
         return self.params
 
+## Set up a keras model class
+import tensorflow as tf
+
+class KerasSequential:
+    '''
+    Docstring.
+    '''
+    def __init__(self):
+        self.layer_info = []
+    
+    def add(self, layer, **kwargs):
+        self.layer_info.append((layer, kwargs))
+    
+    def compile(self, **kwargs):
+        self.compile_info = kwargs
+    
+    def build(self, input_shape):
+        model = tf.keras.models.Sequential()
+        model.add(tf.keras.layers.InputLayer(input_shape=input_shape))
+        for layer, kwargs in self.layer_info:
+            model.add(layer(**kwargs))
+        model.compile(**self.compile_info)
+            # take this out
+        return model
+        
 
 class ModelTrainer:
     '''
     Utility to handle key differences between .fit() and .predict() functions between Scikit-learn and Keras.
     '''
+    @staticmethod
+    def is_keras_seq(model):
+        '''
+        Checks if model instance is of type tf.keras.Model
+        '''
+        return isinstance(model, KerasSequential)
+    
     @staticmethod
     def is_keras(model):
         '''
@@ -49,10 +81,12 @@ class ModelTrainer:
         '''
         Training function wrapper to handle both Sklearn and Keras models.
         '''
-        if ModelTrainer.is_keras(model):
+        if ModelTrainer.is_keras_seq(model):
+            INPUT_SHAPE = X.shape[1]
+            model = model.build(input_shape=X.shape[1])
+            #model.summary()
             # Incorporate additional parameters to fitting - batch_size, epochs, validation_split, callbacks, verbose
-            
-             # If keras model provided without training config default to
+            # If keras model provided without training config default to
             if keras_params:
                 keras_params = keras_params.as_dict()
             else:
@@ -66,9 +100,11 @@ class ModelTrainer:
                 
             # Fit
             model.fit(X, y, **keras_params)
+            return model
         # If sklearn model
         else:
             model.fit(X, y)
+            return model
 
     # Same for 
     @staticmethod
