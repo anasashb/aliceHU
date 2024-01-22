@@ -33,8 +33,6 @@ class KerasParams:
         return self.params
 
 ## Set up a keras model class
-import tensorflow as tf
-
 class KerasSequential:
     '''
     Docstring.
@@ -97,9 +95,14 @@ class ModelTrainer:
                     callbacks=[tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)],
                     verbose=0
                 ).as_dict()
-                
+
+            # Cast data to tensors
+            X_tensor = tf.cast(X.values, dtype=tf.float32)
+            y_tensor = tf.cast(y.values, dtype=tf.float32)
+
             # Fit
-            model.fit(X, y, **keras_params)
+            model.fit(X_tensor, y_tensor, **keras_params)
+
             return model
         # If sklearn model
         else:
@@ -114,10 +117,16 @@ class ModelTrainer:
         '''
         # If keras model, use batch size
         if ModelTrainer.is_keras(model):
+            print('is keras well done.') ##################### delet dis
             batch_size = keras_params.as_dict().get('batch_size') if keras_params else 32
-            preds = model.predict(X, batch_size=batch_size, verbose=0)
+            
+            # Cast data to tensor
+            X_tensor = tf.cast(X.values, dtype=tf.float32)
+
+            preds = model.predict(X_tensor, batch_size=batch_size, verbose=0)
 
             return (preds >= 0.5).astype(int).flatten()
+            #return preds
         # If sklearn just predict
         else:
             return model.predict(X)
