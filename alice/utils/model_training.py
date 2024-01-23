@@ -117,7 +117,7 @@ class ModelTrainer:
         '''
         # If keras model, use batch size
         if ModelTrainer.is_keras(model):
-            print('is keras well done.') ##################### delet dis
+            #print('is keras well done.') ##################### delet this debug line
             batch_size = keras_params.as_dict().get('batch_size') if keras_params else 32
             
             # Cast data to tensor
