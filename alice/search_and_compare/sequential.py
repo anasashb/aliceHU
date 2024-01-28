@@ -34,7 +34,7 @@ class BackEliminator():
         features_to_fix (list): List containing column names (str) of features that will be excluded from feature elimination and thus always included in modeling. (Optional)
     
     Regression Example:
-        seeker = Backeliminator(
+        seeker = BackEliminator(
             X=X_train,
             y=y_train,
             validation_data=(X_val, y_val),
@@ -209,124 +209,7 @@ class BackEliminator():
         # Add functionality to possibly save trained models 
         # Will take up large memory, may be unfeasible
         ### TO DO ###
-    
-    def compare_best_models(
-            self,
-            m1,
-            m2,
-            keras_params=None
-        ): 
-        # Copy all features initially
-        # for both models
-        new_feature_list_m1 = self.initial_feature_list.copy()
-        new_feature_list_m2 = self.initial_feature_list.copy()
-        # Aggreeability scores
-        results = []
-        # First fit models w/o any removed features
-        # Flat lists for fitting
-        full_fit_m1 = feature_list_flatten(new_feature_list_m1)
-        full_fit_m2 = feature_list_flatten(new_feature_list_m2)
-        m1 = ModelTrainer.fit(model=m1, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
-        m2 = ModelTrainer.fit(model=m2, X=self.X[full_fit_m1], y=self.y, keras_params=keras_params)
-        # Predict on validation set
-        if self.validation_data:
-            # Model 1
-            m1_preds = ModelTrainer.predict(model=m1, X=self.X_val[full_fit_m1], keras_params=keras_params)
-            m1_score = self.criterion_registry[self.criterion](self.y_val, m1_preds)
-            # Model 2
-            m2_preds = ModelTrainer.predict(model=m2, X=self.X_val[full_fit_m1], keras_params=keras_params)
-            m2_score = self.criterion_registry[self.criterion](self.y_val, m2_preds)
-            # Aggreeability Score
-            agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
-        # Predict on training set
-        else:
-            # Model 1
-            m1_preds = ModelTrainer.predict(model=m1, X=self.X[full_fit_m1], keras_params=keras_params)
-            m1_score = self.criterion_registry[self.criterion](self.y, m1_preds)
-            # Model 2
-            m2_preds = ModelTrainer.predict(model=m2, X=self.X[full_fit_m1], keras_params=keras_params)
-            m2_score = self.criterion_registry[self.criterion](self.y, m2_preds)
-            # Agreeability score
-            agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
-        
-        # Append to results
-        
-        results.append({
-            f'Best: M1 Included Features': full_fit_m1.copy(),
-            f'Best: M1 {self.criterion.upper()}': m1_score,
-            f'Best: M2 Included Features': full_fit_m2.copy(),
-            f'Best: M2 {self.criterion.upper()}': m2_score,
-            f'Best: Agreeability ({self.agreeability})': agreeability_coeff,
-            })            
 
-        ### DEBUG PRINTS
-        print(f'Initial run: fitted both models with full feature set.')
-        print(f'-' * 150)
-        print(f'Model 1 included: {new_feature_list_m1}. {self.criterion.upper()}: {m1_score}')
-        print(f'Model 2 included: {new_feature_list_m2}. {self.criterion.upper()}: {m2_score}')
-        print(f'-' * 150)
-        print(f'Agreeability Coefficient ({self.agreeability}): {agreeability_coeff}')
-        print(f'=' * 150)
-        ### DEBUG PRINTS   
-        
-        ### DEBUG
-        counter = 0
-        ### DEBUG
-
-        # Begin loop to deselect and evaluate
-        while len(new_feature_list_m1) > 1 and len(new_feature_list_m2) > 1:
-
-            ### DEBUG
-            counter += 1    
-            ### DEBUG    
-
-            # Obtain worst_feature, score and preds from deselect_feature functions
-            #worst_feature_m1, m1_score, m1_preds = self._deselect_feature(new_feature_list_m1, m1)
-            #worst_feature_m2, m2_score, m2_preds = self._deselect_feature(new_feature_list_m2, m2)
-            # Update included feature lists
-            #new_feature_list_m1.remove(worst_feature_m1) 
-            #new_feature_list_m2.remove(worst_feature_m2)
-
-            # Obtain the score lists (removed feature, corresponding score, corresponding preds)
-            score_per_dropped_feature_m1 = self._deselect_feature(new_feature_list_m1, m1, keras_params)
-            score_per_dropped_feature_m2 = self._deselect_feature(new_feature_list_m2, m2, keras_params)
-
-            # Get the worst_feature, best_score, best_preds
-            worst_feature_m1, m1_score, m1_preds = self.find_worst_feature(score_per_dropped_feature_m1)
-            worst_feature_m2, m2_score, m2_preds = self.find_worst_feature(score_per_dropped_feature_m2)
-
-            # Update included feature lists
-            new_feature_list_m1.remove(worst_feature_m1)
-            new_feature_list_m2.remove(worst_feature_m2)
-            # Flat lists to append to results
-            flat_feature_list_m1 = feature_list_flatten(new_feature_list_m1)
-            flat_feature_list_m2 = feature_list_flatten(new_feature_list_m2)
-
-            # Compute agreeability
-            agreeability_coeff = self.agreeability_registry[self.agreeability](m1_preds, m2_preds)
-            # Append to results
-            results.append({
-                'Model 1 Included Features': flat_feature_list_m1.copy(),
-                f'Model 1 {self.criterion.upper()}': m1_score,
-                'Model 2 Included Features': flat_feature_list_m2.copy(),
-                f'Model 2 {self.criterion.upper()}': m2_score,
-                f'Agreeability Coefficient ({self.agreeability})': agreeability_coeff
-            })
-
-            ### DEBUG PRINTS
-            print(f'Iteration {counter}:')
-            print(f'-' * 150)
-            print(f'Model 1 included: {new_feature_list_m1}. {self.criterion.upper()}: {m1_score}')
-            print(f'Model 2 included: {new_feature_list_m2}. {self.criterion.upper()}: {m2_score}')
-            print(f'-' * 150)
-            print(f'Agreeability Coefficient ({self.agreeability}): {agreeability_coeff}')
-            print(f'=' * 150)
-            ### DEBUG PRINTS
-        # Save results
-        self.results = results
-        # Return results
-        return results
-    
 ### Order for best for best    
     def compare_all_models(
             self,
@@ -335,7 +218,47 @@ class BackEliminator():
             keras_params=None
         ):
         '''
-        No docstring yet.
+        Fits and evaluates two different models with various subsets of features. Measures inter-rater agreeability between models' predictions on the validation/test set.
+
+        Args:
+            m1: Sklearn or Keras model.
+            m2: Sklearn or Keras model.
+            keras_params (optional): KerasParams object carrying pre-defined configuration for training a Keras model - batch_size, epochs, validation_split, callbacks, verbose arguments do be called in training. 
+
+        Note on including Keras models:
+            Keras models must be provided as a KerasSequential class object given in this library to ensure proper compiling, fitting and inference during the iteration's of the algorithm.     
+            
+        Example use: 
+            # Define KerasSequential model
+            mlp = KerasSequential() # Initialize multi-layer perceptron as a KerasSequential class object
+            mlp.add(tf.keras.layers.Dense, units=128, activation='linear') # 128 units in layer
+            mlp.add(tf.keras.layers.Dense, units=64, activation='linear') # 64 units in layer
+            mlp.add(tf.keras.layers.Dense, units=1, activation='sigmoid') # Sigmoid for output
+            mlp.compile(
+                optimizer='adam', # adaptive moment estimation as optimizer (default learning rate of 0.001)
+                loss=tf.keras.losses.BinaryCrossentropy(), # Binary Cross-entropy as loss
+                metrics=['accuracy'] # Track accuracy
+            )
+
+            # Define keras_params for training
+            EARLY_STOPPING = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)] # Early stopping callback
+            keras_params = KerasParams(
+                batch_size=32, # batch size for mini-batch training
+                epochs=100, # fit a model for 100 epochs
+                validation_split=0.2, # further 0.8-0.2 split in the training set
+                callbacks=EARLY_STOPPING, # include early stopping as a training callback
+                verbose=0 # no per-epoch logs
+            )
+
+            # Define Random Forest Classifier
+            rfc = RandomForestClassifier(n_estimators=100)
+
+            # Run the algorithm via an initialized BackEliminator class (refer to BackEliminator documentation)
+            results = seeker.compare_all_models(
+                m1=rfc, # Model 1: Random Forest Classifier
+                m2=mlp, # Model 2: MultiLayer Perceptron
+                keras_params=keras_params # Training Parameters for MLP
+            )
         ''' 
         # Copy all features initially
         # for both models

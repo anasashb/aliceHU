@@ -35,7 +35,18 @@ class KerasParams:
 ## Set up a keras model class
 class KerasSequential:
     '''
-    Docstring.
+    A wrapper class designed to maintain user-friendly model building interface of Keras while allowing the models' use in feature selection algorithms.
+    When creating a KerasSequential object, an input shape should not be provided as it is inferred inside the feature selection algorithms's and provided to the KerasSequential class object at every iteration.
+
+    Example Use:
+        mlp = KerasSequential() # Initialize multi-layer perceptron as a KerasSequential class object
+        mlp.add(tf.keras.layers.Dense, units=128, activation='linear') # 128 units in layer
+        mlp.add(tf.keras.layers.Dense, units=64, activation='linear') # 64 units in layer
+        mlp.add(tf.keras.layers.Dense, units=1, activation='sigmoid') # Sigmoid for output
+        mlp.compile(
+            optimizer='adam', # adaptive moment estimation as optimizer (default learning rate of 0.001)
+            loss=tf.keras.losses.BinaryCrossentropy(), # Binary Cross-entropy as loss
+            metrics=['accuracy'] # Track accuracy
     '''
     def __init__(self):
         self.layer_info = []
