@@ -82,6 +82,10 @@ class ModelTrainer:
         if ModelTrainer.is_keras_seq(model):
             INPUT_SHAPE = X.shape[1]
             model = model.build(input_shape=X.shape[1])
+
+            #### DEBUG DEBUG
+            #print(f'Second layer weights at compilation:\n {model.layers[1].get_weights()}') # DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG
+            
             #model.summary()
             # Incorporate additional parameters to fitting - batch_size, epochs, validation_split, callbacks, verbose
             # If keras model provided without training config default to
@@ -102,6 +106,10 @@ class ModelTrainer:
 
             # Fit
             model.fit(X_tensor, y_tensor, **keras_params)
+
+            # print(f'Second layer weights after training:\n {model.layers[1].get_weights()}') # DEBUG DEBUG DEBUG DEBUG DEBUG DEBUG
+
+
 
             return model
         # If sklearn model
