@@ -1,5 +1,7 @@
 # **A**utomated **L**earning for **I**nsightful **C**omparison and **E**valuation (ALICE)
+
 Main directory:
+
 **Notebooks**<br>
 - `customer_churn_test.ipynb` - Jupyter Notebook for current experiments and use demonstration / instructions
 - `customer_churn_dataprocessing.ipynb` - Jupyter Notebook for transparency of data cleaning and manipualtion
