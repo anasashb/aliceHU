@@ -1,1 +1,1 @@
-from .sequential import BackEliminator
+from .sequential import BackEliminator  # noqa: F401

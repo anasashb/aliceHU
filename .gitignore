@@ -1,4 +1,4 @@
-# ignore git files 
+# ignore git files
 *.pyc
 
 # Ignore pychache folders
@@ -8,3 +8,6 @@ __pycache__/
 logs/
 
 /logs/
+
+# backup
+backup.py
