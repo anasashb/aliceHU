@@ -11,6 +11,9 @@ Results included from the repository are from three experiments on the Telco Cus
 - Multi-Layer Perceptron (MLP) vs. Random Forest Classifier (RFC)
 - Random Forest Classifier (RFC) vs. Logistic Regression (Logit)
 
+![ALICE Experiment Results](/experiment_results.png)
+
+
 - - -
 
 ## Main directory:
